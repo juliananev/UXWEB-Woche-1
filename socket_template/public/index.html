@@ -1,3 +1,7 @@
+
+ 
+
+
 <!DOCTYPE html>
 <html>
 
@@ -5,14 +9,94 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>Basic Socket template</title>
     <style>
+        body,
+        html {
+            height: 100%;
+            width: 100%;
+            margin: 0px;
+            touch-action: none; /* disable touch events on the browser itself. We use the touch events for drawing */
+        }
+
+        canvas {
+            height: 100%;
+            width: 100%;
+            display: block;
+            background-color: black;
+        }
     </style>
 </head>
 
 <body>
+    <canvas id="canvas"></canvas>
+
 </body>
 <script src="/socket.io/socket.io.js"></script>
 <script>
- 
+    let canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let painting = false;
+    let ctx = canvas.getContext ('2d');
+    
+    // drawing styles
+    ctx.lineWidth = 100; // Set random line width
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.7; // Set opacity to 50%
+    last_mouse = {
+        x: 0,
+        y: 0
+    };
+
+    function startDraw(e) {
+        painting = true;
+        console.log("start drawing");
+        console.log(e)
+        last_mouse.x = e.clientX;
+        last_mouse.y = e.clientY;
+    }
+
+    function endDraw(e) {
+        painting = false;
+        console.log("end drawing");
+    }
+
+    function draw(e) {
+        if (painting){
+            console.log("drawing");
+            
+            socket.emit("draw", {
+                from: { x: last_mouse.x, y: last_mouse.y },
+                to: { x: e.clientX, y: e.clientY },
+                color: generateRandomColor() // Generate a random color for each drawing event
+            });
+
+            draw_path(last_mouse, {x: e.clientX, y: e.clientY}, "white");
+            last_mouse.x = e.clientX;
+            last_mouse.y = e.clientY;
+        
+        }
+        
+    }
+
+    function draw_path(from, to, colour) {
+        ctx.strokeStyle = generateRandomColor();;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.closePath();
+        ctx.stroke();
+    }
+
+    function generateRandomColor() {
+        const colors = ["#9600ff", "#FF00FF", "#00bcff"]; 
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    canvas.addEventListener('pointerdown', startDraw);
+    canvas.addEventListener('pointerup', endDraw);
+    canvas.addEventListener('pointermove', draw);
+
     const socket = io();
     // received a message from the server
     socket.on("msg", msg => {
@@ -24,10 +108,28 @@
         console.log(msg);
     });
 
+    // connection established to the server
     socket.on("connect", () => {
+        // send a message to the server to the other clients
         socket.emit("client_msg", "Hello from the client " + socket.id);
     });
+
+    // received a draw event from another client
+    socket.on("draw", msg => {
+        console.log("recieved draw event");
+        console.log(msg);
+
+        // Mirror the coordinates received from the socket event
+        let mirrored_from = { x: canvas.width - msg.from.x, y: msg.from.y };
+        let mirrored_to = { x: canvas.width - msg.to.x, y: msg.to.y };
+
+        // Draw the path using the mirrored coordinates
+        draw_path(mirrored_from, mirrored_to,  msg.color);
+    });
+
+
 
 </script>
 
 </html>
+

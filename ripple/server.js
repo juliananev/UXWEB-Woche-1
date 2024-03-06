@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { createServer } from 'node:http';
 
+// the current x position of global canvas. Any new client will be appended to the right of the canvas
+// TODO you can come up with a more sophisticated way to handle this and and also handle the removal of disconnected clients
+let current_x = 0;
+
 // create a new express web server
 let app = express();
+
 
 // create a new socket.io server
 const server = createServer(app);
@@ -29,17 +34,24 @@ io.on('connection', (socket) => {
     // send a welcome message to the client
     socket.emit('msg', "welcome from the server");
 
+    socket.on('ripple', (msg) => {
+        socket.broadcast.emit('ripple', msg);
+    })
+
     // forward the message to all clients except the sender
     socket.on('client_msg', (msg) => {
         socket.broadcast.emit('client_msg', msg);
     })
 
-    // forward draw to all clients except the sender
-    socket.on('draw', (msg) => {
-        socket.broadcast.emit('draw', msg);
-        
-    })
+    socket.on('dimensions', (dimensions) => {
+        console.log('new window size: ' + dimensions.width);
+        socket.emit('offset_x', current_x);
+        console.log('current_x send to client' + current_x)
+        current_x += dimensions.width;
+        // TODO handle the case when the client window is resized
+    });
 
+    
 });
 
 
